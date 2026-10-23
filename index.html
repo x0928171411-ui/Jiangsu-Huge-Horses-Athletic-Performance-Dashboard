@@ -32,8 +32,8 @@
             </div>
             
             <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-                <span id="syncStatus" class="px-3 py-1.5 bg-amber-950/80 text-amber-400 border border-amber-700/50 rounded-full text-xs font-medium flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> 連線中...
+                <span id="syncStatus" class="px-3 py-1.5 bg-emerald-950/80 text-emerald-400 border border-emerald-700/50 rounded-full text-xs font-medium flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 網頁端本機運作模式
                 </span>
                 
                 <label class="flex items-center gap-1.5 px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 active:scale-95 rounded-lg text-xs md:text-sm font-semibold cursor-pointer transition shadow-lg shadow-sky-900/30">
@@ -41,7 +41,7 @@
                     <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="importCSV(event)">
                 </label>
 
-                <button onclick="clearAllCloudData()" class="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950 hover:bg-rose-900 text-rose-300 active:scale-95 rounded-lg text-xs font-semibold border border-rose-800 transition">
+                <button onclick="clearAllLocalData()" class="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950 hover:bg-rose-900 text-rose-300 active:scale-95 rounded-lg text-xs font-semibold border border-rose-800 transition">
                     <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 清空重載
                 </button>
 
@@ -303,55 +303,10 @@
         </div>
     </div>
 
-    <!-- Firebase 即時同步核心 -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyA2sXV_zVzkCR25OFC_G0cfBBvfCz93_p8",
-            authDomain: "softball-data-bc28a.firebaseapp.com",
-            databaseURL: "https://softball-data-bc28a-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "softball-data-bc28a",
-            storageBucket: "softball-data-bc28a.firebasestorage.app",
-            messagingSenderId: "554613511477",
-            appId: "1:554613511477:web:87d2f13a0e2d01a422a87c",
-            measurementId: "G-QW1XXVP78T"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        window.db = db;
-        window.rapsodoRecordsRef = ref(db, 'rapsodo_pitch_records');
-        window.rapsodoAthletesRef = ref(db, 'rapsodo_pitch_athletes');
-        window.set = set;
-
-        const syncEl = document.getElementById('syncStatus');
-        if (syncEl) {
-            syncEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 雲端連線正常';
-            syncEl.className = "px-3 py-1.5 bg-emerald-950/80 text-emerald-400 border border-emerald-700/50 rounded-full text-xs font-medium flex items-center gap-2";
-        }
-
-        onValue(window.rapsodoRecordsRef, (snapshot) => {
-            const data = snapshot.val();
-            window.records = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-            localStorage.setItem('rapsodo_records', JSON.stringify(window.records));
-            updateDropdowns();
-            updateDashboard();
-        });
-
-        onValue(window.rapsodoAthletesRef, (snapshot) => {
-            const data = snapshot.val();
-            window.athletes = data || {};
-            localStorage.setItem('rapsodo_athletes', JSON.stringify(window.athletes));
-            updateDropdowns();
-            updateDashboard();
-        });
-    </script>
-
+    <!-- 本地端離線 localStorage 核心邏輯（完全拿掉 Firebase，不會受中國網路阻擋影響） -->
     <script>
-        window.athletes = JSON.parse(localStorage.getItem('rapsodo_athletes')) || {};
-        window.records = JSON.parse(localStorage.getItem('rapsodo_records')) || [];
+        window.athletes = JSON.parse(localStorage.getItem('local_rapsodo_athletes')) || {};
+        window.records = JSON.parse(localStorage.getItem('local_rapsodo_records')) || [];
 
         const PITCH_COLORS = {
             'FB': '#ef4444', 'FA': '#ef4444', 'FF': '#ef4444',
@@ -369,20 +324,18 @@
         });
 
         function saveData() {
-            localStorage.setItem('rapsodo_athletes', JSON.stringify(window.athletes));
-            localStorage.setItem('rapsodo_records', JSON.stringify(window.records));
-            if (window.rapsodoRecordsRef && window.set) window.set(window.rapsodoRecordsRef, window.records);
-            if (window.rapsodoAthletesRef && window.set) window.set(window.rapsodoAthletesRef, window.athletes);
+            localStorage.setItem('local_rapsodo_athletes', JSON.stringify(window.athletes));
+            localStorage.setItem('local_rapsodo_records', JSON.stringify(window.records));
         }
 
-        function clearAllCloudData() {
-            if (!confirm('確定要清空雲端資料庫嗎？\n清空後請立即點選「匯入 Rapsodo CSV」，系統將把所有轉速、位移與好球帶數據完整同步！')) return;
+        function clearAllLocalData() {
+            if (!confirm('確定要清空本機的所有投球資料嗎？\n清空後可重新匯入 Rapsodo CSV 檔案！')) return;
             window.records = [];
             window.athletes = {};
             saveData();
             updateDropdowns();
             updateDashboard();
-            alert('資料已成功清空！現在請點選「匯入 Rapsodo CSV」匯入報表。');
+            alert('本機資料已成功清空！');
         }
 
         function getPitchName(pt) {
@@ -492,7 +445,7 @@
                         count++;
                     });
 
-                    alert(`成功讀取 ${count} 筆完整運科投球數據！正在同步至雲端...`);
+                    alert(`成功讀取 ${count} 筆運科投球數據（已儲存至本機瀏覽器）！`);
                     saveData();
                     updateDropdowns();
                     updateDashboard();
@@ -535,7 +488,6 @@
 
             const athRecords = window.records.filter(r => r.name === ath);
 
-            // 日期下拉選單
             const dates = [...new Set(athRecords.map(r => r.date))].sort().reverse();
             dateSelect.innerHTML = `<option value="ALL">全部訓練日 (${dates.length} 天)</option>`;
             dates.forEach(d => {
@@ -543,7 +495,6 @@
                 dateSelect.appendChild(opt);
             });
 
-            // 球種下拉選單
             const ptCounts = {};
             athRecords.forEach(r => { ptCounts[r.pitchType] = (ptCounts[r.pitchType] || 0) + 1; });
             const pTypes = Object.keys(ptCounts).sort((a,b) => ptCounts[b] - ptCounts[a]);
@@ -572,7 +523,6 @@
             const editBtn = document.getElementById('editAthleteBtn');
 
             if (ath === 'ALL') {
-                // 顯示全隊總覽比較表，隱藏個人圖表與明細
                 kpiContainer.style.display = 'none';
                 individualChartsContainer.style.display = 'none';
                 arsenalContainer.style.display = 'none';
@@ -691,7 +641,6 @@
                 showlegend: false
             };
 
-            // 1. Break Plot
             const breakTraces = [];
             const types = [...new Set(data.map(d => d.pitchType))];
             types.forEach(pt => {
@@ -717,7 +666,6 @@
                 ]
             }, { responsive: true, displayModeBar: false });
 
-            // 2. Strike Zone Plot
             const zoneTraces = [];
             const validPlateData = data.filter(d => d.px !== null && d.pz !== null);
             const strikeCount = validPlateData.filter(d => d.isStrike).length;
@@ -751,7 +699,6 @@
                 ]
             }, { responsive: true, displayModeBar: false });
 
-            // 3. Trend Chart
             const groupedDate = {};
             data.forEach(d => {
                 if (!groupedDate[d.date]) groupedDate[d.date] = { speeds: [], spins: [] };
@@ -774,7 +721,6 @@
                 yaxis2: { title: '轉速 (RPM)', overlaying: 'y', side: 'right', font: { color: '#818cf8' }, showgrid: false }
             }, { responsive: true, displayModeBar: false });
 
-            // 4. Release Plot
             const releaseData = data.filter(d => d.relSide !== null && d.relHeight !== null);
             Plotly.newPlot('releasePlot', [{
                 x: releaseData.map(d => d.relSide),
@@ -790,7 +736,6 @@
             }, { responsive: true, displayModeBar: false });
         }
 
-        // 全隊速球最新數值比較圖表渲染
         function renderTeamFastballComparison() {
             const allNames = [...new Set(window.records.map(r => r.name))];
             if (allNames.length === 0) return;
